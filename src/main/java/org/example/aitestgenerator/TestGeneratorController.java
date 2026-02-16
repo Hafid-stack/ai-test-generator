@@ -1,5 +1,4 @@
 package org.example.aitestgenerator;
-
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
