@@ -1,5 +1,6 @@
 package org.example.aitestgenerator.service;
 
+import org.example.aitestgenerator.dto.TestRequest;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
@@ -75,5 +76,27 @@ public class TestGenerationService {
         } catch (IOException e) {
             return "Failed to save file: " + e.getMessage();
         }
+    }
+    public String generateTestWithContext(TestRequest request) {
+        String systemPrompt = "You are an expert Java QA engineer. " +
+                "You will be provided with a complete Java class for context, " +
+                "but your task is to write a JUnit 5 test suite ONLY for the specific method requested. " +
+                "Use the provided class imports, dependencies, and constructor to properly mock and set up the test environment (e.g., using Mockito if necessary). " +
+                "Return ONLY the raw Java code for the test class. " +
+                "Do not include markdown formatting, explanations, or backticks.";
+        String userMessage = "Target Method to Test: " + request.methodName() + "\n\n" +
+                "Full Class Context:\n" + request.fullClassCode();
+        String rawResponse = chatClient.prompt()
+                .system(systemPrompt)
+                .user(userMessage)
+                .call()
+                .content();
+        String cleanedCode = cleanAiOutput(rawResponse);
+        String className = extractClassName(cleanedCode);
+        if (className == null) {
+            return "Error: Could not determine class name from generated code.\n\n" + cleanedCode;
+        }
+
+        return saveFileToDisk(className, cleanedCode);
     }
 }
