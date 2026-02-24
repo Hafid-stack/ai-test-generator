@@ -1,6 +1,7 @@
 package org.example.aitestgenerator.controller;
 
 import org.example.aitestgenerator.compiler.InMemoryCompilerSandbox;
+import org.example.aitestgenerator.compiler.TestExecutionEngine;
 import org.example.aitestgenerator.dto.TestRequest;
 import org.example.aitestgenerator.service.TestGenerationService;
 import org.springframework.web.bind.annotation.*;
@@ -37,24 +38,33 @@ public class TestGeneratorController {
     @GetMapping("/sandbox")
     public String testInMemoryCompiler() {
         try {
-            // A raw string of Java code that doesn't exist anywhere on your hard drive
-            String fakeCode = "public class HelloBot { " +
-                    "  public String sayHi() { " +
-                    "    return \"Hello! I was compiled entirely in your RAM!\"; " +
-                    "  } " +
-                    "}";
+            // A raw string containing a real JUnit 5 test class
+            String fakeTestCode =
+                    "import org.junit.jupiter.api.Test;\n" +
+                            "import static org.junit.jupiter.api.Assertions.*;\n" +
+                            "public class MathSandboxTest {\n" +
+                            "    @Test\n" +
+                            "    public void testAddition() {\n" +
+                            "        assertEquals(4, 2 + 2);\n" +
+                            "    }\n" +
+                            "    @Test\n" +
+                            "    public void testFailure() {\n" +
+                            "        assertEquals(5, 2 + 2, \"Math is broken!\");\n" +
+                            "    }\n" +
+                            "}";
 
-            // Compile it and load it
-            Class<?> compiledClass = InMemoryCompilerSandbox.compileAndLoad("HelloBot", fakeCode);
+            // 1. Compile the string into RAM
+            Class<?> compiledClass = InMemoryCompilerSandbox.compileAndLoad("MathSandboxTest", fakeTestCode);
 
-            // Create an instance of the newly compiled class and run the sayHi method!
-            Object instance = compiledClass.getDeclaredConstructor().newInstance();
-            Method method = compiledClass.getMethod("sayHi");
-
-            return (String) method.invoke(instance);
+            // 2. Run the newly compiled class through JUnit
+            return TestExecutionEngine.runTestClass(compiledClass);
 
         } catch (Exception e) {
-            return "Error: " + e.getMessage();
+            return "Compilation Error: " + e.getMessage();
         }
+    }
+    @PostMapping("/generate-and-run")
+    public String generateCompileAndRun(@RequestBody TestRequest request) {
+        return testGenerationService.generateCompileAndRunTest(request);
     }
 }

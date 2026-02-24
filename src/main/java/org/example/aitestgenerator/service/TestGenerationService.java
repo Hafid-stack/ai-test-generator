@@ -1,5 +1,7 @@
 package org.example.aitestgenerator.service;
 
+import org.example.aitestgenerator.compiler.InMemoryCompilerSandbox;
+import org.example.aitestgenerator.compiler.TestExecutionEngine;
 import org.example.aitestgenerator.dto.TestRequest;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
@@ -98,5 +100,48 @@ public class TestGenerationService {
         }
 
         return saveFileToDisk(className, cleanedCode);
+    }
+    public String generateCompileAndRunTest(TestRequest request) {
+        try {
+            // 1. Get raw code from AI
+            String systemPrompt = "You are an expert Java QA engineer. " +
+                    "You will be provided with a complete Java class for context, " +
+                    "but your task is to write a JUnit 5 test suite ONLY for the specific method requested. " +
+                    "Use the provided class imports, dependencies, and constructor to properly mock and set up the test environment. " +
+                    "Return ONLY the raw Java code for the test class. " +
+                    "Do not include markdown formatting, explanations, or backticks.";
+
+            String userMessage = "Target Method to Test: " + request.methodName() + "\n\n" +
+                    "Full Class Context:\n" + request.fullClassCode();
+
+            String rawResponse = chatClient.prompt()
+                    .system(systemPrompt)
+                    .user(userMessage)
+                    .call()
+                    .content();
+
+            // 2. Clean the code and find the class name
+            String cleanedCode = cleanAiOutput(rawResponse);
+            String className = extractClassName(cleanedCode);
+
+            if (className == null) {
+                return "Error: Could not determine class name from AI output.\n\n" + cleanedCode;
+            }
+
+            // 3. The Magic: Compile it in RAM!
+            Class<?> compiledClass = InMemoryCompilerSandbox.compileAndLoad(className, cleanedCode);
+
+            // 4. Run the Test!
+            String executionReport = TestExecutionEngine.runTestClass(compiledClass);
+
+            // 5. Return the code AND the results
+            return "--- GENERATED TEST CODE ---\n" +
+                    cleanedCode +
+                    "\n\n--- EXECUTION RESULTS ---\n" +
+                    executionReport;
+
+        } catch (Exception e) {
+            return "Pipeline Failed: " + e.getMessage();
+        }
     }
 }
